@@ -6,17 +6,18 @@ use Digest::MD5   qw/ md5_hex /;
 use Storable      qw/ freeze thaw /;
 use Hook::LexWrap qw/ wrap /;
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 our $CACHE_TABLE_NAME = 'cache';
 
 sub new {
   my $class = shift;
   my %args = @_ == 1 ? %{$_[0]} : @_;
+  $args{dbfile} ||= '';
   $args{dbh} ||= DBI->connect(
-    "dbi:SQLite:",
+    "dbi:SQLite:$args{dbfile}",
     undef,
     undef,
-    { AutoCommit => 0, RaiseError => 1 }
+    { RaiseError => 1 }
   );
   my $self = Teng::new($class, %args);
   $self->do(qq{
@@ -42,7 +43,7 @@ sub _wrap {
   wrap $method,
     pre => sub {
       my @args = @_;
-      my $class = shift @args;
+      shift @args if ref $args[-1] eq 'Hook::LexWrap::Cleanup';
       $args[-1] = wantarray;
       my $row = $self->single($CACHE_TABLE_NAME, {
         method   => $method,
@@ -104,12 +105,8 @@ Cache::Method - Cache the execution result of your method.
 =head2 Cache on SQLite
 
   use Cache::Method;
-  use DBI;
 
-  my $dbfile = 'cache.db';
-  my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile", '', '');
-  my $cache = Cache::Method->new( dbh => $dbh );
-
+  my $cache = Cache::Method->new( dbfile => 'cache.db' );
   $cache->set('foo');
 
   sub foo { ... }
